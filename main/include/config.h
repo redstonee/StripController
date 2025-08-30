@@ -1,24 +1,17 @@
 #pragma once
-#include "stdint.h"
 
-enum KeyID : uint8_t
-{
-    KEY1 = 1,
-    KEY2 = 2,
-    KEY3 = 3,
+#include <cstdint>
+#include "hal/ledc_types.h"
 
-};
-const KeyID keyIDs[] = {KEY1, KEY2, KEY3};
-constexpr auto KEY_COUNT = sizeof(keyIDs);
+constexpr auto BUTTON_PIN = 6;
 
-constexpr uint8_t PIXEL_PIN = 18;
-constexpr uint8_t PIXEL_COUNT = KEY_COUNT;
-// constexpr uint8_t
+constexpr auto LED_R_PIN = 1;
+constexpr auto LED_G_PIN = 3;
+constexpr auto LED_B_PIN = 0;
 
-constexpr uint8_t VBAT_SENS_PIN = 0;
-constexpr float VBAT_DIV_COEFF = (10.0 + 22.0) / 22;
+constexpr auto LED_R_CH = LEDC_CHANNEL_0;
+constexpr auto LED_G_CH = LEDC_CHANNEL_1;
+constexpr auto LED_B_CH = LEDC_CHANNEL_2;
 
-constexpr uint32_t BLE_PAIR_TIMEOUT = 2e4;
-constexpr uint32_t BLE_RECONN_TIMEOUT = 1e4;
-constexpr uint32_t IDLE_SLEEP_TIMEOUT = 3e4;
-constexpr auto DEFAULT_NAME = "CV Keyboard";
+constexpr auto DEFAULT_NAME = "Striiiiiiip";
+constexpr auto PAIRING_TIMEOUT = 60 * 1000;
