@@ -17,17 +17,25 @@ private:
         return true;
     }
 
+    static bool ledcInstalled;
+
 public:
     ShittyLED(int gpio, ledc_channel_t channel) : _channel(channel)
     {
-        ledc_timer_config_t ledc_timer = {
-            .speed_mode = LEDC_LOW_SPEED_MODE,
-            .duty_resolution = LEDC_TIMER_8_BIT,
-            .timer_num = LEDC_TIMER_0,
-            .freq_hz = 4000,
-            .clk_cfg = LEDC_AUTO_CLK,
-        };
-        ESP_ERROR_CHECK(ledc_timer_config(&ledc_timer));
+        if (!ledcInstalled)
+        {
+            ledc_timer_config_t ledc_timer = {
+                .speed_mode = LEDC_LOW_SPEED_MODE,
+                .duty_resolution = LEDC_TIMER_8_BIT,
+                .timer_num = LEDC_TIMER_0,
+                .freq_hz = 10000,
+                .clk_cfg = LEDC_AUTO_CLK,
+            };
+            ESP_ERROR_CHECK(ledc_timer_config(&ledc_timer));
+            // Initialize fade service.
+            ledc_fade_func_install(0);
+            ledcInstalled = true;
+        }
 
         ledc_channel_config_t ledc_channel = {
             .gpio_num = gpio,
@@ -40,8 +48,6 @@ public:
         };
         ESP_ERROR_CHECK(ledc_channel_config(&ledc_channel));
 
-        // Initialize fade service.
-        ledc_fade_func_install(0);
         ledc_cbs_t callbacks = {.fade_cb = ledc_fade_end_event};
         ledc_cb_register(LEDC_LOW_SPEED_MODE, _channel, &callbacks, this);
     }
@@ -51,3 +57,5 @@ public:
         ledc_set_fade_time_and_start(LEDC_LOW_SPEED_MODE, _channel, brightness, 1000, LEDC_FADE_NO_WAIT);
     }
 };
+
+bool ShittyLED::ledcInstalled = false;

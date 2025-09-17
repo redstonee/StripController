@@ -37,7 +37,7 @@ void ledTask(void *param)
     ESP_ERROR_CHECK(nvs_open("Strip", NVS_READWRITE, &nvsHandle));
 
     // Get previously configured color
-    uint32_t colorConfigured = 0x101010;
+    uint32_t colorConfigured = 0x808080;
     nvs_get_u32(nvsHandle, "color", &colorConfigured);
     setColor(colorConfigured);
     blue::updateColor(colorConfigured);
@@ -80,7 +80,7 @@ extern "C" void app_main()
 {
     esp_pm_config_t pm_config = {
         .max_freq_mhz = 80,
-        .min_freq_mhz = 16,
+        .min_freq_mhz = 40,
         // .light_sleep_enable = true,
     };
     ESP_ERROR_CHECK(esp_pm_configure(&pm_config));
@@ -113,17 +113,18 @@ extern "C" void app_main()
 
         if (!gpio_get_level(static_cast<gpio_num_t>(BUTTON_PIN)))
         {
+            ESP_LOGI(TAG, "Button pressed %d", pressCnt);
             if (pressCnt < 50)
                 pressCnt++;
         }
         else
         {
-            pressCnt = 0;
+            // No valid press
             if (pressCnt < 3)
-                continue;
-
+            {
+            }
             // Short-press to toggle on/off
-            if (pressCnt < 50)
+            else if (pressCnt < 50)
             {
                 isLedOn = !isLedOn;
 
@@ -132,12 +133,15 @@ extern "C" void app_main()
                 xQueueSend(colorConfigQueue, isLedOn ? &allF : &zero, portMAX_DELAY);
 
                 blue::updateColor(isLedOn);
-                continue;
             }
-
             // Long-press to enter pairing mode
-            isPairing = true;
-            blue::startAdvertising();
+            else
+            {
+                // Long-press to enter pairing mode
+                isPairing = true;
+                blue::startAdvertising();
+            }
+            pressCnt = 0;
         }
     }
 }
