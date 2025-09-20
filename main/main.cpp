@@ -26,6 +26,7 @@ void ledTask(void *param)
 
     auto setColor = [&ledR, &ledG, &ledB](uint32_t color)
     {
+        ESP_LOGI(TAG, "Color is set to %06lx", color);
         ledR.setBrightness((color >> 16) & 0xFF);
         ledG.setBrightness((color >> 8) & 0xFF);
         ledB.setBrightness(color & 0xFF);
@@ -44,6 +45,7 @@ void ledTask(void *param)
 
     while (1)
     {
+        vTaskDelay(pdMS_TO_TICKS(100));
         if (isPairing)
         {
             static bool dirUp = true;
@@ -53,7 +55,7 @@ void ledTask(void *param)
         }
 
         uint32_t colorRecv;
-        if (xQueueReceive(colorConfigQueue, &colorRecv, portMAX_DELAY))
+        if (xQueueReceive(colorConfigQueue, &colorRecv, 0))
         {
             if (colorRecv == 0xffffffff)
             {
@@ -78,6 +80,9 @@ void ledTask(void *param)
 
 extern "C" void app_main()
 {
+    static const uint32_t zero = 0;
+    static const uint32_t allF = 0xffffffff;
+
     esp_pm_config_t pm_config = {
         .max_freq_mhz = 80,
         .min_freq_mhz = 40,
@@ -85,12 +90,23 @@ extern "C" void app_main()
     };
     ESP_ERROR_CHECK(esp_pm_configure(&pm_config));
 
-    colorConfigQueue = xQueueCreate(5, sizeof(uint32_t));
-
     blue::init();
+    
+    colorConfigQueue = xQueueCreate(5, sizeof(uint32_t));
+    xTaskCreate(ledTask, "LED Task", 4096, nullptr, 2, nullptr);
+
+    blue::startAdvertising(); // TODO: A pairing process
     ESP_LOGI(TAG, "BLE initialized");
-    blue::setOnAdvCompleteCallback([](NimBLEAdvertising *)
-                                   { isPairing = false; });
+
+    auto onPairingStop = []
+    {
+        ESP_LOGI(TAG, "Pairing complete");
+        xQueueSend(colorConfigQueue, &allF, portMAX_DELAY);
+        isPairing = false;
+    };
+    blue::setOnConnectCallback(onPairingStop);
+    blue::setOnAdvCompleteCallback([&onPairingStop](NimBLEAdvertising *)
+                                   { onPairingStop(); });
 
     gpio_config_t buttonIOConfig = {
         .pin_bit_mask = 1ULL << BUTTON_PIN,
@@ -101,45 +117,36 @@ extern "C" void app_main()
     };
     gpio_config(&buttonIOConfig);
 
-    xTaskCreate(ledTask, "LED Task", 4096, nullptr, 2, nullptr);
-
     static bool isLedOn = true;
     static uint8_t pressCnt = 0;
     while (1)
     {
         vTaskDelay(pdMS_TO_TICKS(20));
-        if (isPairing)
-            continue;
 
         if (!gpio_get_level(static_cast<gpio_num_t>(BUTTON_PIN)))
         {
-            ESP_LOGI(TAG, "Button pressed %d", pressCnt);
-            if (pressCnt < 50)
+            if (pressCnt < 30)
                 pressCnt++;
         }
         else
         {
-            // No valid press
-            if (pressCnt < 3)
-            {
-            }
-            // Short-press to toggle on/off
-            else if (pressCnt < 50)
-            {
-                isLedOn = !isLedOn;
-
-                const uint32_t zero = 0;
-                const uint32_t allF = 0xffffffff;
-                xQueueSend(colorConfigQueue, isLedOn ? &allF : &zero, portMAX_DELAY);
-
-                blue::updateColor(isLedOn);
-            }
             // Long-press to enter pairing mode
-            else
+            if ((pressCnt >= 30) && (!isPairing))
             {
-                // Long-press to enter pairing mode
+                // TODO: Enter pairing mode
                 isPairing = true;
-                blue::startAdvertising();
+            }
+            // Short-press to toggle on/off or cancel pairing mode
+            else if (pressCnt > 3)
+            {
+                if (isPairing)
+                    onPairingStop();
+                else
+                {
+                    isLedOn = !isLedOn;
+                    xQueueSend(colorConfigQueue, isLedOn ? &allF : &zero, portMAX_DELAY);
+                    blue::updateColor(isLedOn);
+                }
             }
             pressCnt = 0;
         }

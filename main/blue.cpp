@@ -29,6 +29,7 @@ namespace blue
 
         void onDisconnect(NimBLEServer *pServer, NimBLEConnInfo &connInfo, int reason) override
         {
+            pServer->startAdvertising();
             if (onDisconnectCallback)
                 onDisconnectCallback();
             ESP_LOGI("BLE", "Disconnected");
@@ -39,9 +40,19 @@ namespace blue
     {
         void onWrite(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo) override
         {
-            auto val = pCharacteristic->getValue().data();
-            auto colorRecved = reinterpret_cast<const uint32_t *>(val);
-            xQueueSend(colorConfigQueue, colorRecved, 10);
+            auto value = pCharacteristic->getValue();
+            if (value.length() > 4)
+            {
+                ESP_LOGW("BLE", "Invalid data length %d", value.length());
+                return;
+            }
+
+            uint32_t colorRecved = 0;
+            for (auto i = 0; i < value.length(); i++)
+            {
+                colorRecved |= (static_cast<uint32_t>(value[i]) << (i * 8));
+            }
+            xQueueSend(colorConfigQueue, &colorRecved, 10);
         }
     };
 
@@ -58,7 +69,7 @@ namespace blue
 
     void init()
     {
-        const char *myShitServiceUUID = "4fafc201-0000-1145-1400-c5c9c331914b";
+        const char *myShitServiceUUID = "1145";
         const char *myFuckingCharUUID = "2333";
 
         NimBLEDevice::init(DEFAULT_NAME);
@@ -70,6 +81,9 @@ namespace blue
         myFuckingChar = myShitService->createCharacteristic(myFuckingCharUUID, WRITE | READ | NOTIFY);
         myFuckingChar->setCallbacks(new CharCallbacks());
         myShitService->start();
+
+        bleServer->getAdvertising()->setName(DEFAULT_NAME);
+        bleServer->addService(myShitService);
     }
 
     void updateColor(uint32_t color)
