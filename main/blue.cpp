@@ -64,7 +64,7 @@ namespace blue
     void startAdvertising()
     {
         if (!bleServer->getAdvertising()->isAdvertising())
-            bleServer->startAdvertising(PAIRING_TIMEOUT);
+            bleServer->startAdvertising();
     }
 
     void init()
@@ -83,6 +83,7 @@ namespace blue
         myShitService->start();
 
         bleServer->getAdvertising()->setName(DEFAULT_NAME);
+        bleServer->getAdvertising()->addServiceUUID(myShitService->getUUID());
         bleServer->addService(myShitService);
     }
 
